@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "591198861834",
+    "project_id": "phf-app-dcbe8",
+    "storage_bucket": "phf-app-dcbe8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:591198861834:android:a94c7f176f869aaef17df3",
+        "android_client_info": {
+          "package_name": "com.example.phf"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCCBmNOy8x4Xi4GtwzGc5QG8HqjY17jw_I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
