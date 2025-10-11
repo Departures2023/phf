@@ -2,6 +2,8 @@ import 'package:phf/models/items.dart';
 import 'package:phf/models/navigation_category.dart';
 import 'package:phf/sevices/database_service.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 Future<List<Items>> getHomePageContent() async {
   try {
@@ -14,61 +16,139 @@ Future<List<Items>> getHomePageContent() async {
   }
 }
 
-// Get navigation categories for the top navigation bar
+// Get navigation categories for the top navigation bar with local caching
 Future<List<NavigationCategory>> getNavigationCategories() async {
   try {
-    final List<NavigationCategory> categories = [];
+    // First, try to load from local cache
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? cachedCategoriesJson = prefs.getString('navigation_categories');
+    final String? lastFetchTime = prefs.getString('categories_last_fetch');
     
-    // List of category file names in Firebase Storage
-    final List<String> categoryFiles = [
-      'class_item',
-      'cloth', 
-      'daily_necessities',
-      'electronic_product',
-      'food',
-      'furnature',
-      'house',
-      'transportation'
-    ];
-    
-    // Get download URLs for each category icon from Firebase Storage
-    for (String categoryFile in categoryFiles) {
-      try {
-        // Reference to the file in Firebase Storage
-        Reference ref = FirebaseStorage.instance
-            .ref()
-            .child('icon')
-            .child('$categoryFile.png');
-        
-        // Get the download URL
-        String downloadUrl = await ref.getDownloadURL();
-        
-        // Create category with proper display name
-        String displayName = _getCategoryDisplayName(categoryFile);
-        
-        categories.add(NavigationCategory(
-          id: categoryFile,
-          name: displayName,
-          image: downloadUrl, // This is the proper Firebase Storage download URL
-          route: '/category/$categoryFile',
-        ));
-      } catch (e) {
-        print('Error getting download URL for $categoryFile: $e');
-        // Add category with placeholder if image fails to load
-        categories.add(NavigationCategory(
-          id: categoryFile,
-          name: _getCategoryDisplayName(categoryFile),
-          image: '', // Empty string will trigger error fallback in UI
-          route: '/category/$categoryFile',
-        ));
+    // Check if we have cached data and it's not too old (24 hours)
+    if (cachedCategoriesJson != null && lastFetchTime != null) {
+      final DateTime lastFetch = DateTime.parse(lastFetchTime);
+      final DateTime now = DateTime.now();
+      final Duration difference = now.difference(lastFetch);
+      
+      // If cached data is less than 24 hours old, use it
+      if (difference.inHours < 24) {
+        try {
+          final List<dynamic> categoriesList = jsonDecode(cachedCategoriesJson);
+          return categoriesList.map((json) => NavigationCategory.fromJson(json)).toList();
+        } catch (e) {
+          print('Error parsing cached categories: $e');
+          // Fall through to fetch from Firebase
+        }
       }
+    }
+    
+    // Fetch from Firebase Storage if no cache or cache is stale
+    final List<NavigationCategory> categories = await _fetchCategoriesFromFirebase();
+    
+    // Cache the results
+    if (categories.isNotEmpty) {
+      final String categoriesJson = jsonEncode(categories.map((cat) => cat.toJson()).toList());
+      await prefs.setString('navigation_categories', categoriesJson);
+      await prefs.setString('categories_last_fetch', DateTime.now().toIso8601String());
     }
     
     return categories;
   } catch (e) {
     print('Error fetching navigation categories: $e');
+    
+    // Try to return cached data even if it's stale as fallback
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final String? cachedCategoriesJson = prefs.getString('navigation_categories');
+      if (cachedCategoriesJson != null) {
+        final List<dynamic> categoriesList = jsonDecode(cachedCategoriesJson);
+        return categoriesList.map((json) => NavigationCategory.fromJson(json)).toList();
+      }
+    } catch (e) {
+      print('Error loading fallback cached categories: $e');
+    }
+    
     return [];
   }
+}
+
+// Fetch categories from Firebase Storage
+Future<List<NavigationCategory>> _fetchCategoriesFromFirebase() async {
+  final List<NavigationCategory> categories = [];
+  
+  // List of category file names in Firebase Storage
+  final List<String> categoryFiles = [
+    'class_item',
+    'cloth', 
+    'daily_necessities',
+    'electronic_product',
+    'food',
+    'furnature',
+    'house',
+    'transportation'
+  ];
+  
+  // Get download URLs for each category icon from Firebase Storage
+  for (String categoryFile in categoryFiles) {
+    try {
+      // Reference to the file in Firebase Storage
+      Reference ref = FirebaseStorage.instance
+          .ref()
+          .child('icon')
+          .child('$categoryFile.png');
+      
+      // Get the download URL
+      String downloadUrl = await ref.getDownloadURL();
+      
+      // Create category with proper display name
+      String displayName = _getCategoryDisplayName(categoryFile);
+      
+      categories.add(NavigationCategory(
+        id: categoryFile,
+        name: displayName,
+        image: downloadUrl, // This is the proper Firebase Storage download URL
+        route: '/category/$categoryFile',
+      ));
+    } catch (e) {
+      print('Error getting download URL for $categoryFile: $e');
+      // Add category with placeholder if image fails to load
+      categories.add(NavigationCategory(
+        id: categoryFile,
+        name: _getCategoryDisplayName(categoryFile),
+        image: '', // Empty string will trigger error fallback in UI
+        route: '/category/$categoryFile',
+      ));
+    }
+  }
+  
+  return categories;
+}
+
+// Force refresh navigation categories from Firebase (bypasses cache)
+Future<List<NavigationCategory>> refreshNavigationCategories() async {
+  try {
+    final List<NavigationCategory> categories = await _fetchCategoriesFromFirebase();
+    
+    // Update cache with fresh data
+    if (categories.isNotEmpty) {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final String categoriesJson = jsonEncode(categories.map((cat) => cat.toJson()).toList());
+      await prefs.setString('navigation_categories', categoriesJson);
+      await prefs.setString('categories_last_fetch', DateTime.now().toIso8601String());
+    }
+    
+    return categories;
+  } catch (e) {
+    print('Error refreshing navigation categories: $e');
+    return [];
+  }
+}
+
+// Clear navigation categories cache
+Future<void> clearNavigationCategoriesCache() async {
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
+  await prefs.remove('navigation_categories');
+  await prefs.remove('categories_last_fetch');
 }
 
 // Helper function to convert file names to display names

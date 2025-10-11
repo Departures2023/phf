@@ -6,6 +6,7 @@ class Items {
   String image;
   double price;
   String category;
+  String description;
   Timestamp launchTime;
   String sellerId; // Link to the user who is selling this item
   String? buyerId; // Link to the user who bought this item (null if not sold)
@@ -17,6 +18,7 @@ class Items {
     required this.image, 
     required this.price, 
     required this.category,
+    required this.description,
     required this.launchTime,
     required this.sellerId,
     this.buyerId,
@@ -30,6 +32,7 @@ class Items {
         image: json['image'] as String, 
         price: json['price'] as double, 
         category: json['category'] as String,
+        description: json['description'] as String? ?? '',
         launchTime: json['launchTime'] as Timestamp,
         sellerId: json['sellerId'] as String,
         buyerId: json['buyerId'] as String?,
@@ -42,6 +45,7 @@ class Items {
     String? image,
     double? price,
     String? category,
+    String? description,
     Timestamp? launchTime,
     String? sellerId,
     String? buyerId,
@@ -53,6 +57,7 @@ class Items {
       image: image ?? this.image,
       price: price ?? this.price,
       category: category ?? this.category,
+      description: description ?? this.description,
       launchTime: launchTime ?? this.launchTime,
       sellerId: sellerId ?? this.sellerId,
       buyerId: buyerId ?? this.buyerId,
@@ -67,6 +72,7 @@ class Items {
       'image': image,
       'price': price,
       'category': category,
+      'description': description,
       'launchTime': launchTime,
       'sellerId': sellerId,
       'buyerId': buyerId,

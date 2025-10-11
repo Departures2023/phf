@@ -28,10 +28,10 @@ class Users {
         password: json['password'] as String, 
         email: json['email'] as String, 
         avatar: json['avatar'] as String, 
-        buyerCredit: json['buyerCredit'] as double, 
-        sellerCredit: json['sellerCredit'] as double, 
-        itemSold: json['itemSold'] as List<int>, 
-        itemBought: json['itemBought'] as List<int>
+        buyerCredit: (json['buyerCredit'] as num).toDouble(), 
+        sellerCredit: (json['sellerCredit'] as num).toDouble(), 
+        itemSold: (json['itemSold'] as List<dynamic>).map((e) => e as int).toList(), 
+        itemBought: (json['itemBought'] as List<dynamic>).map((e) => e as int).toList()
       );
   
   Users copyWith({

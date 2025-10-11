@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'UI/menu.dart';
 import 'models/users.dart';
+import 'sevices/database_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
@@ -24,8 +26,16 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: true);
+  // Determine initial user
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
+  final int? savedUserId = prefs.getInt('currentUserId');
+  Users? initialUser;
+  if (savedUserId != null) {
+    initialUser = await DatabaseService().getUserById(savedUserId);
+  }
+
   // Run the main application
-  runApp(const MyApp());
+  runApp(MyApp(initialUser: initialUser));
 
 }
 /// Main application widget for the PHF Flutter app.
@@ -40,7 +50,8 @@ void main() async {
 /// - Surface color: Light beige for backgrounds
 /// - White text on primary surfaces
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final Users? initialUser;
+  const MyApp({super.key, this.initialUser});
 
   /// Builds the main application widget.
   /// 
@@ -84,7 +95,7 @@ class MyApp extends StatelessWidget {
           // ),
         ),
           home: Menu(
-            currentUser: Users(
+            currentUser: initialUser ?? Users(
               userId: 1,
               name: "Sample User",
               password: "password",

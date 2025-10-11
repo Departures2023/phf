@@ -4,6 +4,7 @@ import 'home_page.dart';
 import 'cart_page.dart';
 import 'sell_page.dart';
 import 'profile_page.dart';
+import 'chat_page.dart';
 import '../models/users.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -20,6 +21,7 @@ class _MenuState extends State<Menu> {
   final List<BottomNavigationBarItem> bottomItems = [
     BottomNavigationBarItem(icon: Icon(CupertinoIcons.home), label: 'Home'),
     BottomNavigationBarItem(icon: Icon(CupertinoIcons.shopping_cart), label: 'Cart'),
+    BottomNavigationBarItem(icon: Icon(CupertinoIcons.chat_bubble_2), label: 'Chat'),
     BottomNavigationBarItem(icon: Icon(CupertinoIcons.camera_fill), label: 'Sell'),
     BottomNavigationBarItem(icon: Icon(CupertinoIcons.person), label: 'Profile'),
   ];
@@ -34,9 +36,10 @@ class _MenuState extends State<Menu> {
     super.initState();
     // Initialize page items with the current user
     pageItems = [
-      HomePage(),
+      HomePage(currentUser: widget.currentUser),
       CartPage(),
-      SellPage(),
+      ChatPage(currentUser: widget.currentUser),
+      SellPage(currentUser: widget.currentUser),
       ProfilePage(currentUser: widget.currentUser),
     ];
     currentPage = pageItems[currentIndex];

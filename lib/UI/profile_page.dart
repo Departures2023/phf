@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../models/users.dart';
 import '../models/items.dart';
+import '../sevices/database_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
 
 class ProfilePage extends StatefulWidget {
   final Users currentUser;
@@ -15,10 +20,12 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   int _selectedIndex = 0; // Default to "Currently Selling" (index 0)
+  late Users _currentUser;
 
   @override
   void initState() {
     super.initState();
+    _currentUser = widget.currentUser;
     _tabController = TabController(length: 3, vsync: this, initialIndex: _selectedIndex);
     _tabController.addListener(() {
       setState(() {
@@ -75,18 +82,21 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         child: Row(
           children: [
             // Avatar
-            CircleAvatar(
-              radius: 35.r,
-              backgroundColor: Theme.of(context).colorScheme.primary,
+            GestureDetector(
+              onTap: _showAvatarOptions,
               child: CircleAvatar(
-                radius: 32.r,
-                backgroundColor: Colors.white,
-                backgroundImage: widget.currentUser.avatar.isNotEmpty
-                    ? NetworkImage(widget.currentUser.avatar)
-                    : null,
-                child: widget.currentUser.avatar.isEmpty
-                    ? Icon(Icons.person, size: 40.sp, color: Theme.of(context).colorScheme.primary)
-                    : null,
+                radius: 46.r,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                child: CircleAvatar(
+                  radius: 42.r,
+                  backgroundColor: Colors.white,
+                  backgroundImage: _currentUser.avatar.isNotEmpty
+                      ? NetworkImage(_currentUser.avatar)
+                      : null,
+                  child: _currentUser.avatar.isEmpty
+                      ? Icon(Icons.person, size: 52.sp, color: Theme.of(context).colorScheme.primary)
+                      : null,
+                ),
               ),
             ),
             
@@ -102,7 +112,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                       children: [
                         Expanded(
                           child: Text(
-                            widget.currentUser.name,
+                            _currentUser.name,
                             style: TextStyle(
                               fontSize: 20.sp,
                               fontWeight: FontWeight.bold,
@@ -110,34 +120,38 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                           ),
                         ),
                         // Seller Rating
-                        Row(
+                        Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.sell, color: Colors.orange, size: 14.sp),
+                            Icon(Icons.sell, color: Colors.orange, size: 25.sp),
                             SizedBox(width: 2.w),
                             Text(
-                              '${widget.currentUser.sellerCredit.toStringAsFixed(1)}',
+                              '${_currentUser.sellerCredit.toStringAsFixed(1)}',
                               style: TextStyle(
-                                fontSize: 12.sp,
+                                fontSize: 20.sp,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
+                            SizedBox(height: 2.h),
+                            Text('Seller rating', style: TextStyle(fontSize: 11.sp, color: Colors.grey[700])),
                           ],
                         ),
                         SizedBox(width: 8.w),
                         // Buyer Rating
-                        Row(
+                        Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.shopping_cart, color: Colors.blue, size: 14.sp),
+                            Icon(Icons.shopping_cart, color: Colors.blue, size: 25.sp),
                             SizedBox(width: 2.w),
                             Text(
-                              '${widget.currentUser.buyerCredit.toStringAsFixed(1)}',
+                              '${_currentUser.buyerCredit.toStringAsFixed(1)}',
                               style: TextStyle(
-                                fontSize: 12.sp,
+                                fontSize: 20.sp,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
+                            SizedBox(height: 2.h),
+                            Text('Buyer rating', style: TextStyle(fontSize: 11.sp, color: Colors.grey[700])),
                           ],
                         ),
                       ],
@@ -148,42 +162,46 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                       children: [
                         Expanded(
                           child: Text(
-                            'ID: ${widget.currentUser.userId}',
+                            'ID: ${_currentUser.userId}',
                             style: TextStyle(
                               color: Colors.grey[600],
-                              fontSize: 12.sp,
+                              fontSize: 15.sp,
                             ),
                           ),
                         ),
                         // Items Sold Count
-                        Row(
+                        Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.check_circle, color: Colors.green, size: 14.sp),
+                            Icon(Icons.check_circle, color: Colors.green, size: 25.sp),
                             SizedBox(width: 2.w),
                             Text(
-                              '${widget.currentUser.itemSold.length}',
+                              '${_currentUser.itemSold.length}',
                               style: TextStyle(
-                                fontSize: 12.sp,
+                                fontSize: 20.sp,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
+                            SizedBox(height: 2.h),
+                            Text('Items sold', style: TextStyle(fontSize: 11.sp, color: Colors.grey[700])),
                           ],
                         ),
                         SizedBox(width: 8.w),
                         // Items Bought Count
-                        Row(
+                        Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.book_outlined, color: Colors.purple, size: 14.sp),
+                            Icon(Icons.book_outlined, color: Colors.purple, size: 25.sp),
                             SizedBox(width: 2.w),
                             Text(
-                              '${widget.currentUser.itemBought.length}',
+                              '${_currentUser.itemBought.length}',
                               style: TextStyle(
-                                fontSize: 12.sp,
+                                fontSize: 20.sp,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
+                            SizedBox(height: 2.h),
+                            Text('Items bought', style: TextStyle(fontSize: 11.sp, color: Colors.grey[700])),
                           ],
                         ),
                       ],
@@ -202,6 +220,326 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _showAvatarOptions() async {
+    // Check if user is logged in (not the default sample user)
+    final bool isLoggedIn = _currentUser.userId != 1;
+    
+    if (!isLoggedIn) {
+      // Show login/register dialog
+      _showAuthDialog();
+      return;
+    }
+    
+    // Show options for logged in user
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Avatar Options'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(Icons.upload),
+                title: Text('Upload New Avatar'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _uploadAvatar();
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.logout),
+                title: Text('Logout'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _logout();
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _uploadAvatar() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? file = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      imageQuality: 85,
+    );
+    
+    if (file == null) return;
+    
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20.w),
+              Text('Uploading avatar...'),
+            ],
+          ),
+        ),
+      );
+      
+      // Upload to Firebase Storage
+      final Reference ref = FirebaseStorage.instance
+          .ref()
+          .child('avatars')
+          .child('${_currentUser.userId}.jpg');
+      
+      await ref.putFile(File(file.path));
+      final String avatarUrl = await ref.getDownloadURL();
+      
+      // Update user in Firestore
+      final Users updatedUser = _currentUser.copyWith(avatar: avatarUrl);
+      await DatabaseService().updateUser(updatedUser);
+      
+      // Update local state
+      setState(() {
+        _currentUser = updatedUser;
+      });
+      
+      // Close loading dialog
+      Navigator.of(context).pop();
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Avatar updated successfully!')),
+      );
+      
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+      
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error uploading avatar: $e')),
+      );
+    }
+  }
+
+  Future<void> _logout() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.remove('currentUserId');
+    
+    // Reset to default user
+    setState(() {
+      _currentUser = Users(
+        userId: 1,
+        name: "Sample User",
+        password: "password",
+        email: "user@example.com",
+        avatar: "",
+        buyerCredit: 4.2,
+        sellerCredit: 3.8,
+        itemSold: [1, 2, 3, 4, 5],
+        itemBought: [6, 7, 8],
+      );
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Logged out successfully')),
+    );
+  }
+
+  Future<void> _showAuthDialog() async {
+    final TextEditingController nameController = TextEditingController();
+    final TextEditingController emailController = TextEditingController();
+    final TextEditingController passwordController = TextEditingController();
+    bool isRegister = true;
+    bool uploadAvatar = false;
+    File? pickedAvatarFile;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setLocalState) {
+          return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+          child: Padding(
+            padding: EdgeInsets.all(16.w),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Login / Register', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 8.h),
+                  Row(
+                    children: [
+                      ChoiceChip(
+                        label: Text('Register'),
+                        selected: isRegister,
+                        onSelected: (_) => setLocalState(() => isRegister = true),
+                      ),
+                      SizedBox(width: 8.w),
+                      ChoiceChip(
+                        label: Text('Login'),
+                        selected: !isRegister,
+                        onSelected: (_) => setLocalState(() => isRegister = false),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 12.h),
+                  if (isRegister)
+                    TextField(
+                      controller: nameController,
+                      decoration: InputDecoration(labelText: 'Name'),
+                    ),
+                  SizedBox(height: 8.h),
+                  TextField(
+                    controller: emailController,
+                    decoration: InputDecoration(labelText: 'Email'),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  SizedBox(height: 8.h),
+                  TextField(
+                    controller: passwordController,
+                    decoration: InputDecoration(labelText: 'Password'),
+                    obscureText: true,
+                  ),
+                  if (isRegister) ...[
+                    SizedBox(height: 12.h),
+                    Row(
+                      children: [
+                        Switch(
+                          value: uploadAvatar,
+                          onChanged: (v) => setLocalState(() => uploadAvatar = v),
+                        ),
+                        Text('Upload avatar now'),
+                      ],
+                    ),
+                    if (uploadAvatar)
+                      Row(
+                        children: [
+                          ElevatedButton(
+                            onPressed: () async {
+                              final ImagePicker picker = ImagePicker();
+                              final XFile? file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, imageQuality: 85);
+                              if (file != null) {
+                                setLocalState(() => pickedAvatarFile = File(file.path));
+                              }
+                            },
+                            child: Text('Choose Image'),
+                          ),
+                          SizedBox(width: 10.w),
+                          if (pickedAvatarFile != null)
+                            Text('Selected', style: TextStyle(color: Colors.green)),
+                        ],
+                      ),
+                  ],
+                  SizedBox(height: 16.h),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text('Cancel'),
+                      ),
+                      SizedBox(width: 8.w),
+                      ElevatedButton(
+                        onPressed: () async {
+                          final String email = emailController.text.trim();
+                          final String password = passwordController.text.trim();
+                          if (email.isEmpty || password.isEmpty || (isRegister && nameController.text.trim().isEmpty)) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Please fill all fields')),
+                            );
+                            return;
+                          }
+                          try {
+                            Users signedIn;
+                            if (isRegister) {
+                              String avatarUrl = '';
+                              if (uploadAvatar && pickedAvatarFile != null) {
+                                final int newId = DateTime.now().millisecondsSinceEpoch;
+                                final Reference ref = FirebaseStorage.instance.ref().child('avatars').child('$newId.jpg');
+                                await ref.putFile(pickedAvatarFile!);
+                                avatarUrl = await ref.getDownloadURL();
+                                final Users newUser = Users(
+                                  userId: newId,
+                                  name: nameController.text.trim(),
+                                  password: password,
+                                  email: email,
+                                  avatar: avatarUrl,
+                                  buyerCredit: 0.0,
+                                  sellerCredit: 0.0,
+                                  itemSold: [],
+                                  itemBought: [],
+                                );
+                                DatabaseService().addUser(newUser);
+                                signedIn = newUser;
+                              } else {
+                                final int newId = DateTime.now().millisecondsSinceEpoch;
+                                final Users newUser = Users(
+                                  userId: newId,
+                                  name: nameController.text.trim(),
+                                  password: password,
+                                  email: email,
+                                  avatar: '',
+                                  buyerCredit: 0.0,
+                                  sellerCredit: 0.0,
+                                  itemSold: [],
+                                  itemBought: [],
+                                );
+                                DatabaseService().addUser(newUser);
+                                signedIn = newUser;
+                              }
+                            } else {
+                              final Users? fetched = await DatabaseService().getUserByEmailAndPassword(email, password);
+                              if (fetched == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Invalid credentials')),
+                                );
+                                return;
+                              }
+                              signedIn = fetched;
+                            }
+
+                            final SharedPreferences prefs = await SharedPreferences.getInstance();
+                            await prefs.setInt('currentUserId', signedIn.userId);
+                            if (mounted) {
+                              setState(() { _currentUser = signedIn; });
+                              Navigator.of(context).pop();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Welcome, ${signedIn.name}')),
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')),
+                              );
+                            }
+                          }
+                        },
+                        child: Text('Submit'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        });
+      },
     );
   }
 
@@ -226,34 +564,57 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   }
 
   Widget _buildItemList(String type) {
-    // This would typically fetch data from your database
-    // For now, we'll show mock data or empty state
-    List<Items> items = _getItemsByType(type);
-    
-    if (items.isEmpty) {
-      return _buildEmptyState(type);
-    }
-    
-    return ListView.builder(
-      padding: EdgeInsets.all(16.w),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        return _buildItemCard(items[index]);
+    return FutureBuilder<List<Items>>(
+      future: _getItemsByType(type),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
+        
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Error loading items: ${snapshot.error}',
+              style: TextStyle(color: Colors.red),
+            ),
+          );
+        }
+        
+        List<Items> items = snapshot.data ?? [];
+        
+        if (items.isEmpty) {
+          return _buildEmptyState(type);
+        }
+        
+        return ListView.builder(
+          padding: EdgeInsets.all(16.w),
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            return _buildItemCard(items[index]);
+          },
+        );
       },
     );
   }
 
-  List<Items> _getItemsByType(String type) {
-    // Mock data - replace with actual database queries
-    switch (type) {
-      case 'sold':
-        return []; // Items sold by user
-      case 'bought':
-        return []; // Items bought by user
-      case 'selling':
-        return []; // Items currently being sold by user
-      default:
-        return [];
+  Future<List<Items>> _getItemsByType(String type) async {
+    try {
+      final String userId = _currentUser.userId.toString();
+      switch (type) {
+        case 'sold':
+          return await DatabaseService().getSoldItemsBySellerId(userId);
+        case 'bought':
+          return await DatabaseService().getBoughtItemsByBuyerId(userId);
+        case 'selling':
+          final allItems = await DatabaseService().getItemsBySellerId(userId);
+          // Filter out sold items to show only currently selling
+          return allItems.where((item) => !item.isSold).toList();
+        default:
+          return [];
+      }
+    } catch (e) {
+      print('Error fetching items: $e');
+      return [];
     }
   }
 
