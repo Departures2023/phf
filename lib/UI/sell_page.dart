@@ -412,7 +412,7 @@ class _SellPageState extends State<SellPage> {
         category: _selectedCategory,
         description: _descriptionController.text.trim(),
         launchTime: Timestamp.now(),
-        sellerId: widget.currentUser.userId.toString(),
+        sellerId: widget.currentUser.userId,
         isSold: false,
       );
 

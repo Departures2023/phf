@@ -8,8 +8,8 @@ class Items {
   String category;
   String description;
   Timestamp launchTime;
-  String sellerId; // Link to the user who is selling this item
-  String? buyerId; // Link to the user who bought this item (null if not sold)
+  int sellerId; // Link to the user who is selling this item
+  int? buyerId; // Link to the user who bought this item (null if not sold)
   bool isSold; // Whether the item has been sold
 
   Items({
@@ -34,8 +34,8 @@ class Items {
         category: json['category'] as String,
         description: json['description'] as String? ?? '',
         launchTime: json['launchTime'] as Timestamp,
-        sellerId: json['sellerId'] as String,
-        buyerId: json['buyerId'] as String?,
+        sellerId: json['sellerId'] as int,
+        buyerId: json['buyerId'] as int?,
         isSold: json['isSold'] as bool? ?? false,
       );
   
@@ -47,8 +47,8 @@ class Items {
     String? category,
     String? description,
     Timestamp? launchTime,
-    String? sellerId,
-    String? buyerId,
+    int? sellerId,
+    int? buyerId,
     bool? isSold,
   }) {
     return Items(

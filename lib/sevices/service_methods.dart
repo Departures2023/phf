@@ -42,17 +42,23 @@ Future<List<NavigationCategory>> getNavigationCategories() async {
       }
     }
     
-    // Fetch from Firebase Storage if no cache or cache is stale
-    final List<NavigationCategory> categories = await _fetchCategoriesFromFirebase();
-    
-    // Cache the results
-    if (categories.isNotEmpty) {
-      final String categoriesJson = jsonEncode(categories.map((cat) => cat.toJson()).toList());
-      await prefs.setString('navigation_categories', categoriesJson);
-      await prefs.setString('categories_last_fetch', DateTime.now().toIso8601String());
+    // Try to fetch from Firebase Storage first
+    try {
+      final List<NavigationCategory> categories = await _fetchCategoriesFromFirebase();
+      
+      // Cache the results
+      if (categories.isNotEmpty) {
+        final String categoriesJson = jsonEncode(categories.map((cat) => cat.toJson()).toList());
+        await prefs.setString('navigation_categories', categoriesJson);
+        await prefs.setString('categories_last_fetch', DateTime.now().toIso8601String());
+      }
+      
+      return categories;
+    } catch (e) {
+      print('Error fetching from Firebase Storage: $e');
+      // Fall back to static categories
+      return _getStaticCategories();
     }
-    
-    return categories;
   } catch (e) {
     print('Error fetching navigation categories: $e');
     
@@ -68,7 +74,8 @@ Future<List<NavigationCategory>> getNavigationCategories() async {
       print('Error loading fallback cached categories: $e');
     }
     
-    return [];
+    // Final fallback to static categories
+    return _getStaticCategories();
   }
 }
 
@@ -111,11 +118,11 @@ Future<List<NavigationCategory>> _fetchCategoriesFromFirebase() async {
       ));
     } catch (e) {
       print('Error getting download URL for $categoryFile: $e');
-      // Add category with placeholder if image fails to load
+      // Add category with empty image - UI will use fallback icons
       categories.add(NavigationCategory(
         id: categoryFile,
         name: _getCategoryDisplayName(categoryFile),
-        image: '', // Empty string will trigger error fallback in UI
+        image: '', // Empty string will trigger fallback icons in UI
         route: '/category/$categoryFile',
       ));
     }
@@ -149,6 +156,60 @@ Future<void> clearNavigationCategoriesCache() async {
   final SharedPreferences prefs = await SharedPreferences.getInstance();
   await prefs.remove('navigation_categories');
   await prefs.remove('categories_last_fetch');
+}
+
+// Static categories fallback (doesn't require Firebase Storage)
+List<NavigationCategory> _getStaticCategories() {
+  return [
+    NavigationCategory(
+      id: 'class_item',
+      name: 'Class Items',
+      image: '', // Empty image will trigger fallback icons
+      route: '/category/class_item',
+    ),
+    NavigationCategory(
+      id: 'cloth',
+      name: 'Clothing',
+      image: '',
+      route: '/category/cloth',
+    ),
+    NavigationCategory(
+      id: 'daily_necessities',
+      name: 'Daily Necessities',
+      image: '',
+      route: '/category/daily_necessities',
+    ),
+    NavigationCategory(
+      id: 'electronic_product',
+      name: 'Electronics',
+      image: '',
+      route: '/category/electronic_product',
+    ),
+    NavigationCategory(
+      id: 'food',
+      name: 'Food',
+      image: '',
+      route: '/category/food',
+    ),
+    NavigationCategory(
+      id: 'furnature',
+      name: 'Furniture',
+      image: '',
+      route: '/category/furnature',
+    ),
+    NavigationCategory(
+      id: 'house',
+      name: 'House',
+      image: '',
+      route: '/category/house',
+    ),
+    NavigationCategory(
+      id: 'transportation',
+      name: 'Transportation',
+      image: '',
+      route: '/category/transportation',
+    ),
+  ];
 }
 
 // Helper function to convert file names to display names

@@ -87,7 +87,7 @@ class _ChatPageState extends State<ChatPage> {
           Icon(
             Icons.chat_bubble_outline,
             size: 64.sp,
-            color: Colors.grey[400],
+            color: Colors.grey[700],
           ),
           SizedBox(height: 16.h),
           Text(
@@ -114,27 +114,29 @@ class _ChatPageState extends State<ChatPage> {
 
   Widget _buildChatRoomCard(ChatRoom chatRoom) {
     return Card(
-      margin: EdgeInsets.only(bottom: 12.h),
-      elevation: 2,
+      margin: EdgeInsets.only(bottom: 16.h),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
       child: ListTile(
+        contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
         leading: CircleAvatar(
-          radius: 25.r,
+          radius: 30.r,
           backgroundColor: Theme.of(context).colorScheme.primary,
           child: CircleAvatar(
-            radius: 23.r,
+            radius: 28.r,
             backgroundColor: Colors.white,
             backgroundImage: chatRoom.otherUser.avatar.isNotEmpty
                 ? NetworkImage(chatRoom.otherUser.avatar)
                 : null,
             child: chatRoom.otherUser.avatar.isEmpty
-                ? Icon(Icons.person, size: 25.sp, color: Theme.of(context).colorScheme.primary)
+                ? Icon(Icons.person, size: 30.sp, color: Theme.of(context).colorScheme.primary)
                 : null,
           ),
         ),
         title: Text(
           chatRoom.otherUser.name,
           style: TextStyle(
-            fontSize: 16.sp,
+            fontSize: 24.sp,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -142,22 +144,24 @@ class _ChatPageState extends State<ChatPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (chatRoom.lastMessage != null) ...[
+              SizedBox(height: 4.h),
               Text(
                 chatRoom.lastMessage!.content,
-                style: TextStyle(
-                  fontSize: 14.sp,
-                  color: Colors.grey[600],
-                ),
+            style: TextStyle(
+              fontSize: 20.sp,
+              color: Colors.grey[800],
+            ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              SizedBox(height: 4.h),
+              SizedBox(height: 6.h),
             ],
             Text(
               'Item: ${chatRoom.item.itemName}',
               style: TextStyle(
-                fontSize: 12.sp,
-                color: Colors.grey[500],
+                fontSize: 18.sp,
+                color: Colors.grey[800],
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -169,23 +173,23 @@ class _ChatPageState extends State<ChatPage> {
               Text(
                 _formatTime(chatRoom.lastMessage!.timestamp),
                 style: TextStyle(
-                  fontSize: 12.sp,
-                  color: Colors.grey[500],
+                  fontSize: 18.sp,
+                  color: Colors.grey[800],
                 ),
               ),
-            SizedBox(height: 4.h),
+            SizedBox(height: 6.h),
             if (chatRoom.unreadCount > 0)
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.primary,
-                  borderRadius: BorderRadius.circular(10.r),
+                  borderRadius: BorderRadius.circular(12.r),
                 ),
                 child: Text(
                   '${chatRoom.unreadCount}',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 10.sp,
+                    fontSize: 16.sp,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -203,7 +207,6 @@ class _ChatPageState extends State<ChatPage> {
       QuerySnapshot snapshot = await FirebaseFirestore.instance
           .collection('chat_rooms')
           .where('participants', arrayContains: widget.currentUser.userId.toString())
-          .orderBy('lastMessageTime', descending: true)
           .get();
       
       List<ChatRoom> chatRooms = [];
@@ -215,9 +218,14 @@ class _ChatPageState extends State<ChatPage> {
         List<String> participants = List<String>.from(data['participants']);
         String otherUserId = participants.firstWhere((id) => id != widget.currentUser.userId.toString());
         
+        print('Chat room ${doc.id}: participants = $participants, current user = ${widget.currentUser.userId}, other user = $otherUserId');
+        
         // Get other user info
         Users? otherUser = await DatabaseService().getUserById(int.parse(otherUserId));
-        if (otherUser == null) continue;
+        if (otherUser == null) {
+          print('Could not find user with ID $otherUserId');
+          continue;
+        }
         
         // Get item info
         String itemId = data['itemId'];
@@ -242,6 +250,14 @@ class _ChatPageState extends State<ChatPage> {
           unreadCount: unreadCount,
         ));
       }
+      
+      // Sort by lastMessageTime in descending order (newest first)
+      chatRooms.sort((a, b) {
+        if (a.lastMessage == null && b.lastMessage == null) return 0;
+        if (a.lastMessage == null) return 1;
+        if (b.lastMessage == null) return -1;
+        return b.lastMessage!.timestamp.compareTo(a.lastMessage!.timestamp);
+      });
       
       return chatRooms;
     } catch (e) {
@@ -364,11 +380,11 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
           children: [
             Text(
               widget.chatRoom.otherUser.name,
-              style: TextStyle(fontSize: 16.sp),
+              style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold),
             ),
             Text(
               widget.chatRoom.item.itemName,
-              style: TextStyle(fontSize: 12.sp, color: Colors.white70),
+              style: TextStyle(fontSize: 18.sp, color: Colors.white70),
             ),
           ],
         ),
@@ -397,7 +413,6 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
       stream: FirebaseFirestore.instance
           .collection('messages')
           .where('chatRoomId', isEqualTo: widget.chatRoom.id)
-          .orderBy('timestamp', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
@@ -412,11 +427,14 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
             .map((doc) => Message.fromJson(doc.data() as Map<String, dynamic>))
             .toList();
         
+        // Sort messages by timestamp in descending order (newest first)
+        messages.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+        
         if (messages.isEmpty) {
           return Center(
             child: Text(
               'No messages yet. Start the conversation!',
-              style: TextStyle(color: Colors.grey[600]),
+              style: TextStyle(color: Colors.grey[800]),
             ),
           );
         }
@@ -437,22 +455,30 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   Widget _buildMessageBubble(Message message) {
     bool isMe = message.senderId == widget.currentUser.userId.toString();
     
+    // Debug logging
+    print('Message Debug:');
+    print('  - Message senderId: ${message.senderId}');
+    print('  - Current user ID: ${widget.currentUser.userId}');
+    print('  - Current user name: ${widget.currentUser.name}');
+    print('  - Is me: $isMe');
+    print('  - Message content: ${message.content}');
+    
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: EdgeInsets.only(bottom: 8.h),
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-        constraints: BoxConstraints(maxWidth: 0.7 * MediaQuery.of(context).size.width),
+        margin: EdgeInsets.only(bottom: 12.h),
+        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 14.h),
+        constraints: BoxConstraints(maxWidth: 0.75 * MediaQuery.of(context).size.width),
         decoration: BoxDecoration(
           color: isMe 
               ? Theme.of(context).colorScheme.primary
               : Colors.white,
-          borderRadius: BorderRadius.circular(20.r),
+          borderRadius: BorderRadius.circular(25.r),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
-              blurRadius: 4,
-              offset: Offset(0, 2),
+              blurRadius: 6,
+              offset: Offset(0, 3),
             ),
           ],
         ),
@@ -463,15 +489,16 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
               message.content,
               style: TextStyle(
                 color: isMe ? Colors.white : Colors.black,
-                fontSize: 14.sp,
+                fontSize: 22.sp,
+                fontWeight: FontWeight.w500,
               ),
             ),
-            SizedBox(height: 4.h),
+            SizedBox(height: 6.h),
             Text(
               _formatMessageTime(message.timestamp),
               style: TextStyle(
-                color: isMe ? Colors.white70 : Colors.grey[600],
-                fontSize: 10.sp,
+                color: isMe ? Colors.white70 : Colors.grey[800],
+                fontSize: 16.sp,
               ),
             ),
           ],
@@ -482,14 +509,14 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
 
   Widget _buildMessageInput() {
     return Container(
-      padding: EdgeInsets.all(16.w),
+      padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: Offset(0, -2),
+            blurRadius: 6,
+            offset: Offset(0, -3),
           ),
         ],
       ),
@@ -500,24 +527,29 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
               controller: _messageController,
               decoration: InputDecoration(
                 hintText: 'Type a message...',
+                hintStyle: TextStyle(
+                  fontSize: 16.sp,
+                  color: Colors.grey[800],
+                ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(25.r),
+                  borderRadius: BorderRadius.circular(30.r),
                   borderSide: BorderSide.none,
                 ),
                 filled: true,
-                fillColor: Colors.grey[100],
-                contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                fillColor: Colors.grey[200],
+                contentPadding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
               ),
+              style: TextStyle(fontSize: 16.sp),
               maxLines: null,
               onSubmitted: (_) => _sendMessage(),
             ),
           ),
-          SizedBox(width: 8.w),
+          SizedBox(width: 12.w),
           FloatingActionButton(
             onPressed: _sendMessage,
             backgroundColor: Theme.of(context).colorScheme.primary,
-            child: Icon(Icons.send, color: Colors.white),
-            mini: true,
+            child: Icon(Icons.send, color: Colors.white, size: 24.sp),
+            mini: false,
           ),
         ],
       ),
@@ -541,6 +573,13 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
         read: false,
       );
       
+      // Debug logging
+      print('📤 Sending Message:');
+      print('  - Sender ID: ${message.senderId}');
+      print('  - Sender Name: ${widget.currentUser.name}');
+      print('  - Content: ${message.content}');
+      print('  - Chat Room ID: ${message.chatRoomId}');
+      
       // Save message
       await FirebaseFirestore.instance
           .collection('messages')
@@ -556,7 +595,10 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
         'lastMessageTime': message.timestamp,
       });
       
+      print('Message sent by user ${widget.currentUser.userId} (${widget.currentUser.name}) to chat room ${widget.chatRoom.id}');
+      
     } catch (e) {
+      print('Error sending message: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error sending message: $e')),
       );

@@ -7,6 +7,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
+import '../utils/sample_data.dart';
+import 'login_page.dart';
+import '../utils/database_setup.dart';
+import '../utils/demo_data_generator.dart';
 
 class ProfilePage extends StatefulWidget {
   final Users currentUser;
@@ -35,6 +39,46 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh user data when the page becomes visible
+    _refreshUserData();
+  }
+
+  @override
+  void didUpdateWidget(ProfilePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Refresh when widget is updated (e.g., when navigating back from transaction page)
+    _refreshUserData();
+  }
+
+
+  Future<void> _refreshUserData() async {
+    try {
+      // Get the current user ID from SharedPreferences
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final int? currentUserId = prefs.getInt('currentUserId');
+      
+      if (currentUserId != null && currentUserId != _currentUser.userId) {
+        // Only update if the user ID has changed
+        print('🔄 User changed from ${_currentUser.userId} to $currentUserId, refreshing profile...');
+        final Users? newUser = await DatabaseService().getUserById(currentUserId);
+        if (newUser != null && mounted) {
+          setState(() {
+            _currentUser = newUser;
+          });
+          print('✅ Profile updated for user: ${newUser.name}');
+        }
+      } else if (currentUserId == null) {
+        // User logged out, but we're still showing profile - this shouldn't happen
+        print('⚠️ No current user ID found, but profile page is still showing');
+      }
+    } catch (e) {
+      print('Error refreshing user data: $e');
+    }
+  }
+
+  @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
@@ -42,6 +86,11 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
+    // Check for user changes on every build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshUserData();
+    });
+    
     return Scaffold(
       backgroundColor: Color.fromARGB(212, 237, 211, 190),
       appBar: AppBar(
@@ -114,7 +163,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                           child: Text(
                             _currentUser.name,
                             style: TextStyle(
-                              fontSize: 20.sp,
+                              fontSize: 26.sp,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -128,12 +177,12 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                             Text(
                               '${_currentUser.sellerCredit.toStringAsFixed(1)}',
                               style: TextStyle(
-                                fontSize: 20.sp,
+                                fontSize: 24.sp,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                             SizedBox(height: 2.h),
-                            Text('Seller rating', style: TextStyle(fontSize: 11.sp, color: Colors.grey[700])),
+                            Text('Seller rating', style: TextStyle(fontSize: 15.sp, color: Colors.grey[800])),
                           ],
                         ),
                         SizedBox(width: 8.w),
@@ -146,12 +195,12 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                             Text(
                               '${_currentUser.buyerCredit.toStringAsFixed(1)}',
                               style: TextStyle(
-                                fontSize: 20.sp,
+                                fontSize: 24.sp,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                             SizedBox(height: 2.h),
-                            Text('Buyer rating', style: TextStyle(fontSize: 11.sp, color: Colors.grey[700])),
+                            Text('Buyer rating', style: TextStyle(fontSize: 15.sp, color: Colors.grey[800])),
                           ],
                         ),
                       ],
@@ -164,8 +213,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                           child: Text(
                             'ID: ${_currentUser.userId}',
                             style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 15.sp,
+                              color: Colors.grey[800],
+                              fontSize: 18.sp,
                             ),
                           ),
                         ),
@@ -178,12 +227,12 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                             Text(
                               '${_currentUser.itemSold.length}',
                               style: TextStyle(
-                                fontSize: 20.sp,
+                                fontSize: 24.sp,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                             SizedBox(height: 2.h),
-                            Text('Items sold', style: TextStyle(fontSize: 11.sp, color: Colors.grey[700])),
+                            Text('Items sold', style: TextStyle(fontSize: 15.sp, color: Colors.grey[800])),
                           ],
                         ),
                         SizedBox(width: 8.w),
@@ -196,12 +245,12 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                             Text(
                               '${_currentUser.itemBought.length}',
                               style: TextStyle(
-                                fontSize: 20.sp,
+                                fontSize: 24.sp,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                             SizedBox(height: 2.h),
-                            Text('Items bought', style: TextStyle(fontSize: 11.sp, color: Colors.grey[700])),
+                            Text('Items bought', style: TextStyle(fontSize: 15.sp, color: Colors.grey[800])),
                           ],
                         ),
                       ],
@@ -210,12 +259,128 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                 ),
               ),
             
-            // Settings Icon
+            // Refresh Button
             IconButton(
-              onPressed: () {
-                // Navigate to settings
-              },
+              onPressed: _refreshUserData,
+              icon: Icon(Icons.refresh, size: 24.sp),
+              tooltip: 'Refresh Profile',
+            ),
+            // Settings Icon
+            PopupMenuButton<String>(
               icon: Icon(Icons.settings, size: 24.sp),
+              onSelected: (value) async {
+                if (value == 'sample_data') {
+                  await _addSampleData();
+                } else if (value == 'init_database') {
+                  await _initializeDatabase();
+                } else if (value == 'generate_demo_data') {
+                  await _generateDemoData();
+                } else if (value == 'clear_database') {
+                  await _clearDatabase();
+                } else if (value == 'test_indexes') {
+                  await _testIndexes();
+                } else if (value == 'test_profile') {
+                  await _testProfileData();
+                } else if (value == 'fix_database') {
+                  await _fixDatabaseIssues();
+                } else if (value == 'fix_user_arrays') {
+                  await _fixUserArrays();
+                } else if (value == 'logout') {
+                  await _handleLogout();
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'sample_data',
+                  child: Row(
+                    children: [
+                      Icon(Icons.add_box, size: 20.sp),
+                      SizedBox(width: 8.w),
+                      Text('Add Sample Data'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'init_database',
+                  child: Row(
+                    children: [
+                      Icon(Icons.storage, size: 20.sp),
+                      SizedBox(width: 8.w),
+                      Text('Initialize Database'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'generate_demo_data',
+                  child: Row(
+                    children: [
+                      Icon(Icons.video_library, size: 20.sp, color: Colors.deepPurple),
+                      SizedBox(width: 8.w),
+                      Text('🎬 Generate Demo Data', style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'test_indexes',
+                  child: Row(
+                    children: [
+                      Icon(Icons.speed, size: 20.sp, color: Colors.blue),
+                      SizedBox(width: 8.w),
+                      Text('Test Indexes'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'test_profile',
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_search, size: 20.sp, color: Colors.green),
+                      SizedBox(width: 8.w),
+                      Text('Test Profile Data'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'fix_database',
+                  child: Row(
+                    children: [
+                      Icon(Icons.build, size: 20.sp, color: Colors.orange),
+                      SizedBox(width: 8.w),
+                      Text('Fix Database Issues'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'fix_user_arrays',
+                  child: Row(
+                    children: [
+                      Icon(Icons.sync, size: 20.sp, color: Colors.purple),
+                      SizedBox(width: 8.w),
+                      Text('Fix User Arrays'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'clear_database',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_forever, size: 20.sp, color: Colors.red),
+                      SizedBox(width: 8.w),
+                      Text('Clear Database', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'logout',
+                  child: Row(
+                    children: [
+                      Icon(Icons.logout, size: 20.sp, color: Colors.black87),
+                      SizedBox(width: 8.w),
+                      Text('Logout'),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -356,6 +521,395 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Logged out successfully')),
     );
+  }
+
+  Future<void> _addSampleData() async {
+    try {
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20.w),
+              Text('Adding sample data...'),
+            ],
+          ),
+        ),
+      );
+      
+      await SampleData.addAllSampleData();
+      
+      // Close loading dialog
+      Navigator.of(context).pop();
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sample data added successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+      
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error adding sample data: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _initializeDatabase() async {
+    try {
+      // Show confirmation dialog
+      final bool? confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(
+            'Initialize Database',
+            style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            'This will create all required collections and sample data for the app to work properly.\n\nThis includes:\n• Sample users\n• Sample items\n• Sample purchase orders\n• Sample notifications\n• Sample chat rooms\n\nDo you want to continue?',
+            style: TextStyle(fontSize: 16.sp),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+              child: Text('Initialize'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20.w),
+              Text('Initializing database...'),
+            ],
+          ),
+        ),
+      );
+
+      await DatabaseSetup.initializeDatabase();
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Database initialized successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      // Close loading dialog if it's open
+      Navigator.of(context).pop();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error initializing database: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _clearDatabase() async {
+    try {
+      // Show confirmation dialog
+      final bool? confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(
+            'Clear Database',
+            style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: Colors.red),
+          ),
+          content: Text(
+            '⚠️ WARNING: This will delete ALL data from:\n• Purchase orders\n• Notifications\n• Chat rooms\n• Messages\n\nThis action cannot be undone!\n\nAre you sure you want to continue?',
+            style: TextStyle(fontSize: 16.sp),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: Text('Clear All'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20.w),
+              Text('Clearing database...'),
+            ],
+          ),
+        ),
+      );
+
+      await DatabaseSetup.clearAllCollections();
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Database cleared successfully!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    } catch (e) {
+      // Close loading dialog if it's open
+      Navigator.of(context).pop();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error clearing database: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _testIndexes() async {
+    try {
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20.w),
+              Text('Testing queries...'),
+            ],
+          ),
+        ),
+      );
+
+      // Test queries and print instructions
+      await DatabaseSetup.testQueriesForIndexes();
+      DatabaseSetup.printIndexInstructions();
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show instructions dialog
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(
+            'Firestore Index Setup',
+            style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'To fix query performance issues, create these indexes in Firebase Console:',
+                  style: TextStyle(fontSize: 16.sp),
+                ),
+                SizedBox(height: 16.h),
+                Text(
+                  '🔗 Go to: Firebase Console → Firestore → Indexes',
+                  style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 12.h),
+                Text(
+                  '📊 Required Indexes:',
+                  style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 8.h),
+                Text(
+                  '1. NOTIFICATIONS:\n   userId (Ascending), createdAt (Descending)',
+                  style: TextStyle(fontSize: 14.sp),
+                ),
+                SizedBox(height: 4.h),
+                Text(
+                  '2. MESSAGES:\n   chatRoomId (Ascending), read (Ascending), senderId (Ascending)',
+                  style: TextStyle(fontSize: 14.sp),
+                ),
+                SizedBox(height: 4.h),
+                Text(
+                  '3. PURCHASE_ORDERS:\n   buyerId (Ascending), createdAt (Descending)\n   sellerId (Ascending), createdAt (Descending)',
+                  style: TextStyle(fontSize: 14.sp),
+                ),
+                SizedBox(height: 4.h),
+                Text(
+                  '4. CHAT_ROOMS:\n   participants (Arrays), createdAt (Descending)',
+                  style: TextStyle(fontSize: 14.sp),
+                ),
+                SizedBox(height: 16.h),
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(8.r),
+                    border: Border.all(color: Colors.blue[200]!),
+                  ),
+                  child: Text(
+                    '⚡ After creating indexes, the app will work much faster!',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.blue[800],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      // Close loading dialog if it's open
+      Navigator.of(context).pop();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error testing indexes: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _showDisclaimerIfFirstTime() async {
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final bool hasSeenDisclaimer = prefs.getBool('hasSeenDisclaimer') ?? false;
+      
+      if (!hasSeenDisclaimer) {
+        await prefs.setBool('hasSeenDisclaimer', true);
+        
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: Text(
+                'Important Notice',
+                style: TextStyle(
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.warning,
+                    color: Colors.orange,
+                    size: 48.sp,
+                  ),
+                  SizedBox(height: 16.h),
+                  Text(
+                    'This app does NOT handle any transactions or payments.',
+                    style: TextStyle(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 12.h),
+                  Text(
+                    '• All transactions are between users directly\n'
+                    '• No payment processing is included\n'
+                    '• Users are responsible for their own transactions\n'
+                    '• Please arrange payment methods separately\n'
+                    '• Use this app only for item discovery and communication',
+                    style: TextStyle(fontSize: 14.sp),
+                  ),
+                  SizedBox(height: 16.h),
+                  Container(
+                    padding: EdgeInsets.all(12.w),
+                    decoration: BoxDecoration(
+                      color: Colors.orange[50],
+                      borderRadius: BorderRadius.circular(8.r),
+                      border: Border.all(color: Colors.orange[200]!),
+                    ),
+                    child: Text(
+                      'Please ensure you understand this before using the app.',
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.orange[800],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text(
+                    'I Understand',
+                    style: TextStyle(fontSize: 16.sp),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error showing disclaimer: $e');
+    }
   }
 
   Future<void> _showAuthDialog() async {
@@ -520,6 +1074,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text('Welcome, ${signedIn.name}')),
                               );
+                              // Show disclaimer for first-time login
+                              await _showDisclaimerIfFirstTime();
                             }
                           } catch (e) {
                             if (mounted) {
@@ -551,9 +1107,9 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         controller: _tabController,
         indicatorColor: Theme.of(context).colorScheme.primary,
         labelColor: Theme.of(context).colorScheme.primary,
-        unselectedLabelColor: Colors.grey[600],
-        labelStyle: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500),
-        unselectedLabelStyle: TextStyle(fontSize: 14.sp),
+        unselectedLabelColor: Colors.grey[800],
+        labelStyle: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w500),
+        unselectedLabelStyle: TextStyle(fontSize: 18.sp),
         tabs: [
           Tab(text: 'Currently Selling'),
           Tab(text: 'Item Sold'),
@@ -565,6 +1121,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
 
   Widget _buildItemList(String type) {
     return FutureBuilder<List<Items>>(
+      key: ValueKey('${_currentUser.userId}_$type'), // Force rebuild when user changes
       future: _getItemsByType(type),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -599,7 +1156,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
 
   Future<List<Items>> _getItemsByType(String type) async {
     try {
-      final String userId = _currentUser.userId.toString();
+      final int userId = _currentUser.userId;
       switch (type) {
         case 'sold':
           return await DatabaseService().getSoldItemsBySellerId(userId);
@@ -653,8 +1210,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           Text(
             message,
             style: TextStyle(
-              fontSize: 16.sp,
-              color: Colors.grey[600],
+              fontSize: 20.sp,
+              color: Colors.grey[800],
             ),
           ),
         ],
@@ -703,7 +1260,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                   Text(
                     item.itemName,
                     style: TextStyle(
-                      fontSize: 16.sp,
+                      fontSize: 20.sp,
                       fontWeight: FontWeight.bold,
                     ),
                     maxLines: 2,
@@ -713,8 +1270,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                   Text(
                     item.category,
                     style: TextStyle(
-                      fontSize: 12.sp,
-                      color: Colors.grey[600],
+                      fontSize: 16.sp,
+                      color: Colors.grey[800],
                     ),
                   ),
                   SizedBox(height: 8.h),
@@ -724,7 +1281,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                       Text(
                         '\$${item.price.toStringAsFixed(2)}',
                         style: TextStyle(
-                          fontSize: 16.sp,
+                          fontSize: 20.sp,
                           fontWeight: FontWeight.bold,
                           color: Colors.green,
                         ),
@@ -739,7 +1296,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                           child: Text(
                             'Sold',
                             style: TextStyle(
-                              fontSize: 10.sp,
+                              fontSize: 14.sp,
                               color: Colors.green[700],
                               fontWeight: FontWeight.w500,
                             ),
@@ -754,6 +1311,412 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         ),
       ),
     );
+  }
+
+  Future<void> _testProfileData() async {
+    try {
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16.w),
+              Text('Testing profile data...'),
+            ],
+          ),
+        ),
+      );
+
+      await DatabaseSetup.testProfileFunctionality();
+      
+      // Close loading dialog
+      Navigator.of(context).pop();
+      
+      // Show results dialog
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Profile Test Results'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Profile data testing completed! Check the console for detailed results.',
+                  style: TextStyle(fontSize: 16.sp),
+                ),
+                SizedBox(height: 16.h),
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(8.r),
+                    border: Border.all(color: Colors.green[200]!),
+                  ),
+                  child: Text(
+                    '✅ This will help verify that profile counts match actual item lists!',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.green[800],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      // Close loading dialog if it's open
+      Navigator.of(context).pop();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error testing profile data: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _fixDatabaseIssues() async {
+    try {
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16.w),
+              Text('Fixing database issues...'),
+            ],
+          ),
+        ),
+      );
+
+      await DatabaseSetup.fixDatabaseInconsistencies();
+      
+      // Close loading dialog
+      Navigator.of(context).pop();
+      
+      // Show results dialog
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Database Fix Results'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Database inconsistencies have been fixed! Check the console for detailed results.',
+                  style: TextStyle(fontSize: 16.sp),
+                ),
+                SizedBox(height: 16.h),
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(8.r),
+                    border: Border.all(color: Colors.orange[200]!),
+                  ),
+                  child: Text(
+                    '🔧 Items have been updated to match user arrays. Try testing profile data again!',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.orange[800],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      // Close loading dialog if it's open
+      Navigator.of(context).pop();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error fixing database issues: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _fixUserArrays() async {
+    try {
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16.w),
+              Text('Fixing user arrays...'),
+            ],
+          ),
+        ),
+      );
+
+      await DatabaseSetup.fixUserArrays();
+      
+      // Close loading dialog
+      Navigator.of(context).pop();
+      
+      // Show results dialog
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('User Arrays Fixed'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'User arrays have been updated to match actual item states! Check the console for detailed results.',
+                  style: TextStyle(fontSize: 16.sp),
+                ),
+                SizedBox(height: 16.h),
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: Colors.purple[50],
+                    borderRadius: BorderRadius.circular(8.r),
+                    border: Border.all(color: Colors.purple[200]!),
+                  ),
+                  child: Text(
+                    '🔄 User itemSold and itemBought arrays now match the actual items in the database!',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.purple[800],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      // Close loading dialog if it's open
+      Navigator.of(context).pop();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error fixing user arrays: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _generateDemoData() async {
+    try {
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 20.h),
+              Text('Generating comprehensive demo data...'),
+              SizedBox(height: 12.h),
+              Text(
+                'This will create users, items, transactions, chats, and notifications',
+                style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+
+      await DemoDataGenerator.generateAllDemoData();
+      
+      // Close loading dialog
+      Navigator.of(context).pop();
+      
+      // Show success dialog
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green, size: 28.sp),
+              SizedBox(width: 12.w),
+              Text('Demo Data Ready!'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '🎉 Your app is now loaded with comprehensive demo data!',
+                  style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 16.h),
+                _buildDemoDataSummary('👥 Users', '8 realistic student profiles'),
+                _buildDemoDataSummary('📦 Items', '20 items across all categories'),
+                _buildDemoDataSummary('💳 Transactions', '7 transactions (various statuses)'),
+                _buildDemoDataSummary('💬 Chats', '4 chat conversations'),
+                _buildDemoDataSummary('🔔 Notifications', '5 notification examples'),
+                SizedBox(height: 16.h),
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: Colors.purple[50],
+                    borderRadius: BorderRadius.circular(8.r),
+                    border: Border.all(color: Colors.purple[200]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '🎬 Demo Video Tips:',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.purple[800],
+                        ),
+                      ),
+                      SizedBox(height: 8.h),
+                      Text(
+                        '• Login as any user (emily.chen@university.edu, demo123)\n'
+                        '• Show home page with diverse items\n'
+                        '• Demonstrate chat functionality\n'
+                        '• Show transactions and notifications\n'
+                        '• Highlight the rating system',
+                        style: TextStyle(fontSize: 12.sp, color: Colors.purple[700]),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Got it!'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      // Close loading dialog if it's open
+      Navigator.of(context).pop();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error generating demo data: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Widget _buildDemoDataSummary(String icon, String text) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8.h),
+      child: Row(
+        children: [
+          Text(icon, style: TextStyle(fontSize: 16.sp)),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 14.sp, color: Colors.grey[700]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleLogout() async {
+    // Show confirmation dialog
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Logout'),
+        content: Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('Logout', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        // Clear user session
+        final SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.remove('currentUserId');
+        await prefs.remove('hasSeenDisclaimer');
+
+        // Navigate to login page and remove all previous routes
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => LoginPage()),
+            (route) => false,
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error logging out: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 }
 

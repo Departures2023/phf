@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'UI/menu.dart';
+import 'UI/login_page.dart';
 import 'models/users.dart';
 import 'sevices/database_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -64,50 +66,45 @@ class MyApp extends StatelessWidget {
   /// Returns the configured MaterialApp widget
   @override
   Widget build(BuildContext context) {
-    return Container(
-      child: MaterialApp(
-        title: 'PHF',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: const ColorScheme(
-            // Primary color for app bars and primary buttons (pink/magenta)
-            primary: Color.fromARGB(180, 200, 23, 138),
-            // Secondary color for secondary buttons and accents
-            secondary: Colors.green,
-            // Error color for error states and validation
-            error: Colors.red,
-            // Light theme configuration
-            brightness: Brightness.light,
-            // Color for text/icons on error backgrounds
-            onError: Colors.yellow,
-            // Text color on primary surfaces (white text on pink)
-            onPrimary: Colors.white,
-            // Text color on secondary surfaces
-            onSecondary: Color.fromARGB(255, 0, 0, 0),
-            // Text color on surface backgrounds
-            onSurface: Color.fromARGB(255, 0, 0, 0),
-            // Background color for cards and surfaces (light beige)
-            surface: Color.fromARGB(212, 237, 211, 190),
-          )
-          // useMaterial3: true,
-          // colorScheme: ColorScheme.fromSeed(
-          //   seedColor: const Color.fromARGB(255, 225, 4, 129),
-          // ),
-        ),
-          home: Menu(
-            currentUser: initialUser ?? Users(
-              userId: 1,
-              name: "Sample User",
-              password: "password",
-              email: "user@example.com",
-              avatar: "",
-              buyerCredit: 4.2,
-              sellerCredit: 3.8,
-              itemSold: [1, 2, 3, 4, 5],
-              itemBought: [6, 7, 8],
-            ),
-          )
-      ),
+    return ScreenUtilInit(
+      designSize: const Size(375, 812), // iPhone X design size
+      minTextAdapt: true,
+      splitScreenMode: true,
+      builder: (context, child) {
+        return MaterialApp(
+          title: 'Grin Market',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            colorScheme: const ColorScheme(
+              // Primary color for app bars and primary buttons (pink/magenta)
+              primary: Color.fromARGB(180, 200, 23, 138),
+              // Secondary color for secondary buttons and accents
+              secondary: Colors.green,
+              // Error color for error states and validation
+              error: Colors.red,
+              // Light theme configuration
+              brightness: Brightness.light,
+              // Color for text/icons on error backgrounds
+              onError: Colors.yellow,
+              // Text color on primary surfaces (white text on pink)
+              onPrimary: Colors.white,
+              // Text color on secondary surfaces
+              onSecondary: Color.fromARGB(255, 0, 0, 0),
+              // Text color on surface backgrounds
+              onSurface: Color.fromARGB(255, 0, 0, 0),
+              // Background color for cards and surfaces (light beige)
+              surface: Color.fromARGB(212, 237, 211, 190),
+            )
+            // useMaterial3: true,
+            // colorScheme: ColorScheme.fromSeed(
+            //   seedColor: const Color.fromARGB(255, 225, 4, 129),
+            // ),
+          ),
+          home: initialUser != null
+              ? Menu(currentUser: initialUser!)
+              : LoginPage(),
+        );
+      },
     );
   }
 }
